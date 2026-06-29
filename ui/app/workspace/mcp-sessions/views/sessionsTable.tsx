@@ -117,7 +117,7 @@ export default function SessionsTable({
 	};
 
 	return (
-		<div className="space-y-4">
+		<div className="flex grow flex-col overflow-hidden">
 			<AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
@@ -148,7 +148,7 @@ export default function SessionsTable({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			<div className="flex items-center justify-between gap-4">
+			<div className="mb-4 flex items-center justify-between gap-4">
 				<div>
 					<h2 className="text-lg font-semibold tracking-tight">MCP Auth Sessions</h2>
 					<p className="text-muted-foreground text-sm">
@@ -157,22 +157,24 @@ export default function SessionsTable({
 				</div>
 			</div>
 
-			<SessionsFilterBar
-				search={search}
-				onSearchChange={onSearchChange}
-				kindFilter={kindFilter}
-				onKindFilterChange={onKindFilterChange}
-				statusFilter={statusFilter}
-				onStatusFilterChange={onStatusFilterChange}
-				authModeFilter={authModeFilter}
-				onAuthModeFilterChange={onAuthModeFilterChange}
-				hasActiveFilters={hasActiveFilters}
-				onClearFilters={onClearFilters}
-			/>
+			<div className="mb-4">
+				<SessionsFilterBar
+					search={search}
+					onSearchChange={onSearchChange}
+					kindFilter={kindFilter}
+					onKindFilterChange={onKindFilterChange}
+					statusFilter={statusFilter}
+					onStatusFilterChange={onStatusFilterChange}
+					authModeFilter={authModeFilter}
+					onAuthModeFilterChange={onAuthModeFilterChange}
+					hasActiveFilters={hasActiveFilters}
+					onClearFilters={onClearFilters}
+				/>
+			</div>
 
-			<div className={`overflow-auto rounded-sm border ${isFetching ? "opacity-70 transition-opacity" : ""}`}>
-				<Table>
-					<TableHeader>
+			<div className={`mb-2 grow overflow-hidden rounded-sm border ${isFetching ? "opacity-70 transition-opacity" : ""}`}>
+				<Table containerClassName="h-full overflow-auto">
+					<TableHeader className="bg-muted sticky top-0 z-20">
 						<TableRow>
 							<TableHead>MCP server</TableHead>
 							<TableHead>
@@ -257,30 +259,38 @@ export default function SessionsTable({
 			</div>
 
 			{totalCount > 0 && (
-				<div className="flex shrink-0 items-center justify-between px-2 text-xs">
-					<p className="text-muted-foreground">
-						Showing {offset + 1}-{Math.min(offset + limit, totalCount)} of {totalCount}
-					</p>
-					<div className="flex gap-2">
+				<div className="flex shrink-0 items-center justify-between text-xs" data-testid="pagination">
+					<div className="text-muted-foreground flex items-center gap-2">
+						{(offset + 1).toLocaleString()}-{Math.min(offset + limit, totalCount).toLocaleString()} of {totalCount.toLocaleString()} entries
+					</div>
+
+					<div className="flex items-center gap-2">
 						<Button
-							variant="outline"
+							variant="ghost"
 							size="sm"
-							disabled={offset === 0}
 							onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+							disabled={offset === 0}
 							data-testid="mcp-sessions-pagination-prev-btn"
+							aria-label="Previous page"
 						>
-							<ChevronLeft className="mr-1 h-4 w-4" />
-							Previous
+							<ChevronLeft className="size-3" />
 						</Button>
+
+						<div className="flex items-center gap-1">
+							<span>Page</span>
+							<span>{Math.floor(offset / limit) + 1}</span>
+							<span>of {Math.ceil(totalCount / limit)}</span>
+						</div>
+
 						<Button
-							variant="outline"
+							variant="ghost"
 							size="sm"
-							disabled={offset + limit >= totalCount}
 							onClick={() => onOffsetChange(offset + limit)}
+							disabled={offset + limit >= totalCount}
 							data-testid="mcp-sessions-pagination-next-btn"
+							aria-label="Next page"
 						>
-							Next
-							<ChevronRight className="ml-1 h-4 w-4" />
+							<ChevronRight className="size-3" />
 						</Button>
 					</div>
 				</div>
