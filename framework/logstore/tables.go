@@ -61,6 +61,7 @@ type SearchFilters struct {
 	RoutingEngineUsed []string          `json:"routing_engine_used,omitempty"` // For filtering by routing engine (routing-rule, governance, loadbalancing)
 	StartTime         *time.Time        `json:"start_time,omitempty"`
 	EndTime           *time.Time        `json:"end_time,omitempty"`
+	Period            string            `json:"period,omitempty"`
 	MinLatency        *float64          `json:"min_latency,omitempty"`
 	MaxLatency        *float64          `json:"max_latency,omitempty"`
 	MinTokens         *int              `json:"min_tokens,omitempty"`
@@ -196,14 +197,14 @@ type Log struct {
 	StopReason              *string   `gorm:"type:varchar(50);index:idx_logs_stop_reason" json:"stop_reason,omitempty"`                   // Why the model stopped: "stop", "length", "content_filter", "tool_calls", etc.
 	ErrorDetails            string    `gorm:"type:text" json:"-"`                                                                         // JSON serialized *schemas.BifrostError
 	Stream                  bool      `gorm:"default:false" json:"stream"`                                                                // true if this was a streaming response
-	ContentSummary          string    `gorm:"type:text" json:"content_summary,omitempty"` // Last user message preview; UI log-list display fallback when payload fields are offloaded to object storage
-	RawRequest              string    `gorm:"type:text" json:"raw_request"`                         // Populated when `send-back-raw-request` is on
-	RawResponse             string    `gorm:"type:text" json:"raw_response"`                        // Populated when `send-back-raw-response` is on
-	PassthroughRequestBody  string    `gorm:"type:text" json:"passthrough_request_body,omitempty"`  // Raw body for passthrough requests (UTF-8)
-	PassthroughResponseBody string    `gorm:"type:text" json:"passthrough_response_body,omitempty"` // Raw body for passthrough responses (UTF-8)
-	RoutingEngineLogs       string    `gorm:"type:text" json:"routing_engine_logs,omitempty"`       // Formatted routing engine decision logs
-	PluginLogs              string    `gorm:"type:text" json:"plugin_logs,omitempty"`               // JSON serialized plugin log entries grouped by plugin name
-	Metadata                *string   `gorm:"type:text" json:"-"`                                   // JSON serialized map[string]interface{}
+	ContentSummary          string    `gorm:"type:text" json:"content_summary,omitempty"`                                                 // Last user message preview; UI log-list display fallback when payload fields are offloaded to object storage
+	RawRequest              string    `gorm:"type:text" json:"raw_request"`                                                               // Populated when `send-back-raw-request` is on
+	RawResponse             string    `gorm:"type:text" json:"raw_response"`                                                              // Populated when `send-back-raw-response` is on
+	PassthroughRequestBody  string    `gorm:"type:text" json:"passthrough_request_body,omitempty"`                                        // Raw body for passthrough requests (UTF-8)
+	PassthroughResponseBody string    `gorm:"type:text" json:"passthrough_response_body,omitempty"`                                       // Raw body for passthrough responses (UTF-8)
+	RoutingEngineLogs       string    `gorm:"type:text" json:"routing_engine_logs,omitempty"`                                             // Formatted routing engine decision logs
+	PluginLogs              string    `gorm:"type:text" json:"plugin_logs,omitempty"`                                                     // JSON serialized plugin log entries grouped by plugin name
+	Metadata                *string   `gorm:"type:text" json:"-"`                                                                         // JSON serialized map[string]interface{}
 	IsLargePayloadRequest   bool      `gorm:"default:false" json:"is_large_payload_request"`
 	IsLargePayloadResponse  bool      `gorm:"default:false" json:"is_large_payload_response"`
 	HasObject               bool      `gorm:"default:false" json:"-"` // True when payload is stored in object storage
