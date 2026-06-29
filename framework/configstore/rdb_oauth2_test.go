@@ -384,9 +384,10 @@ func TestListOAuth2Sessions_JoinsAndExcludesRevoked(t *testing.T) {
 	require.NoError(t, s.DB().Create(sessTok).Error)
 	require.NoError(t, s.DB().Create(deadTok).Error)
 
-	rows, err := s.ListOAuth2Sessions(ctx)
+	rows, total, err := s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{})
 	require.NoError(t, err)
 	require.Len(t, rows, 2, "revoked grants are excluded")
+	require.Equal(t, int64(2), total, "total count excludes revoked grants")
 
 	byID := map[string]OAuth2SessionRow{}
 	for _, r := range rows {
@@ -405,6 +406,83 @@ func TestListOAuth2Sessions_JoinsAndExcludesRevoked(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound)
 	// Revoking an already-revoked grant reports not-found.
 	assert.ErrorIs(t, s.RevokeOAuth2Session(ctx, "rt-dead"), ErrNotFound)
+}
+
+// TestListOAuth2Sessions_FilterAndPaginate pins the DB-side filtering +
+// pagination: ordering (created_at DESC), limit/offset paging, the total count
+// (independent of the page slice), the bf_mode filter, and case-insensitive
+// search across the joined client name, the joined VK display name, and the
+// bound identity (bf_sub).
+func TestListOAuth2Sessions_FilterAndPaginate(t *testing.T) {
+	s := setupOAuth2TestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, s.DB().Create(&tables.TableOAuth2Client{
+		ID: "c1", ClientID: "client-1", ClientName: "Acme Server",
+		RedirectURIs: []string{"http://127.0.0.1/cb"}, GrantTypes: []string{"authorization_code"}, CreatedAt: time.Now(),
+	}).Error)
+	require.NoError(t, s.DB().Create(&tables.TableOAuth2Client{
+		ID: "c2", ClientID: "client-2", ClientName: "Beta Server",
+		RedirectURIs: []string{"http://127.0.0.1/cb"}, GrantTypes: []string{"authorization_code"}, CreatedAt: time.Now(),
+	}).Error)
+	require.NoError(t, s.DB().Create(&tables.TableVirtualKey{ID: "vk-1", Name: "Alpha VK", Value: "sk-bf-alpha"}).Error)
+
+	base := time.Now()
+	rtA := makeRefreshToken("rt-a", "fa", "client-1", "h-a") // vk mode, bf_sub vk-1 → display "Alpha VK"
+	rtA.CreatedAt = base.Add(-3 * time.Minute)
+	rtB := makeRefreshToken("rt-b", "fb", "client-1", "h-b")
+	rtB.BfMode, rtB.BfSub = "user", "user@acme.com"
+	rtB.CreatedAt = base.Add(-2 * time.Minute)
+	rtC := makeRefreshToken("rt-c", "fc", "client-2", "h-c")
+	rtC.BfMode, rtC.BfSub = "session", "sess-xyz"
+	rtC.CreatedAt = base.Add(-1 * time.Minute)
+	require.NoError(t, s.DB().Create(rtA).Error)
+	require.NoError(t, s.DB().Create(rtB).Error)
+	require.NoError(t, s.DB().Create(rtC).Error)
+
+	ids := func(rows []OAuth2SessionRow) []string {
+		out := make([]string, len(rows))
+		for i, r := range rows {
+			out[i] = r.ID
+		}
+		return out
+	}
+
+	// Page 1 (newest first), limit 2 — total reflects all matches, not the page.
+	rows, total, err := s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Limit: 2})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, []string{"rt-c", "rt-b"}, ids(rows), "ordered created_at DESC")
+
+	// Page 2.
+	rows, total, err = s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Limit: 2, Offset: 2})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, []string{"rt-a"}, ids(rows))
+
+	// bf_mode filter.
+	rows, total, err = s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Modes: []string{"user"}})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, []string{"rt-b"}, ids(rows))
+
+	// Search matches the joined VK display name.
+	rows, total, err = s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Search: "alpha"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, []string{"rt-a"}, ids(rows))
+
+	// Search matches the joined client name.
+	rows, total, err = s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Search: "beta"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, []string{"rt-c"}, ids(rows))
+
+	// Search matches the bound identity (bf_sub).
+	rows, total, err = s.ListOAuth2Sessions(ctx, OAuth2SessionsQueryParams{Search: "user@acme"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, []string{"rt-b"}, ids(rows))
 }
 
 // TestSweepConvergence_TokenSweepThenClientSweep pins the documented ordering: a
